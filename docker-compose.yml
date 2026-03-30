@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: . # build file in currend dir is dockerfile
+      dockerfile: Dockerfile
+    volumes: # create volume to save data if i deleted container 
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    ports: # run app on port 8000 and app is run on container by port 8000 
+      - 8000:8000
+    environment:
+      - DB_USER=postgres
+      - DB_HOST=db # host is different form nodejs because it is name of the service in another container
+      - DB_DATABASE=postgres_db
+      - DB_PASSWORD=mypassword
+      - DB_PORT=5432
+    depends_on:
+      - db
+
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=postgres_db
+    ports:
+      - 5432:5432  # run app on port 5432 and app is run on container by port 5432 
+
+volumes:
+  postgres_data:
+
+  # it will run 2 services app and db
+  # app is depend on db so run db first to enable run app successfully
+  # docker-compose up
+
+  # docker-compose up --build to make sure that app up by container and connected with db in another container
+  
