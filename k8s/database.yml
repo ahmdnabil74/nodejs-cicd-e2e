@@ -72,6 +72,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: gp2    # ← ضيف السطر دا
   resources:
     requests:
       storage: 3Gi

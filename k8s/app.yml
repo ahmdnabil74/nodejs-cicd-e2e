@@ -40,7 +40,7 @@ spec:
              cpu: "250m"
             limits:
               memory: "512Mi"
-              cpu: "500M"
+              cpu: "500m"
 
 ---
 apiVersion: v1
@@ -58,7 +58,7 @@ spec:
     - name: nodejs-app
       port: 8000 # port which service will listend on it inside cluster 
       targetPort: 8000 # port inside pod 
-      nodePort: 30080
+      nodePort: 32000 # port which service will listend on it outside cluster
 
 
 ---

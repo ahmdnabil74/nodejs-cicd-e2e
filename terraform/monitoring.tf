@@ -5,44 +5,22 @@ variable "kube_monitoring_stack_values" {
       adminUser: admin
       adminPassword: admin
       enabled: true
-      ingress:
-        enabled: true
-        ingressClassName: nginx
-        annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
-        hosts:
-          - grafana.YOUR_DOMAIN.com
-        tls:
-          - secretName: grafana-tls
-            hosts:
-              - grafana.YOUR_DOMAIN.com
+      service:
+        type: NodePort
+        nodePort: 30090
 
     alertmanager:
       enabled: true
-      ingress:
-        enabled: true
-        ingressClassName: nginx
-        annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
-        hosts:
-          - alertmanager.YOUR_DOMAIN.com
-        tls:
-          - secretName: alertmanager-tls
-            hosts:
-              - alertmanager.YOUR_DOMAIN.com
+      alertmanagerSpec:
+        replicas: 1
+      service:
+        type: NodePort
+        nodePort: 30910
 
     prometheus:
-      ingress:
-        enabled: true
-        ingressClassName: nginx
-        annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
-        hosts:
-          - prometheus.YOUR_DOMAIN.com
-        tls:
-          - secretName: prometheus-tls
-            hosts:
-              - prometheus.YOUR_DOMAIN.com
+      service:
+        type: NodePort
+        nodePort: 30900
       prometheusSpec:
         replicas: 2
         replicaExternalLabelName: prometheus_replica
@@ -96,5 +74,6 @@ resource "helm_release" "kube_monitoring_stack" {
 
   create_namespace = true
 
-  values = [var.kube_monitoring_stack_values]
+  values     = [var.kube_monitoring_stack_values]
+  depends_on = [module.eks]
 }

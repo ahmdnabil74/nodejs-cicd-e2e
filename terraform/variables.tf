@@ -56,7 +56,7 @@ variable "zone_offset" {
 
 variable "asg_sys_instance_types" {
   type        = list(string)
-  default     = ["t3a.medium"]
+  default     = ["m7i-flex.large"]
   description = "List of EC2 instance machine types to be used in EKS for the system workload."
 }
 

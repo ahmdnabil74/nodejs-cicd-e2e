@@ -14,7 +14,7 @@ const app = express();
 // it take vars from envs like as docker or k8s 
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || 'postgres-service',
   database: process.env.DB_DATABASE || 'postgres_db',
   password: process.env.DB_PASSWORD || 'mypassword',
   port: process.env.DB_PORT || 5432,

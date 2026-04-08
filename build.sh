@@ -1,106 +1,113 @@
 #!/bin/bash
 
-# Variables
+# ================= Variables =================
 cluster_name="cluster-1-test"
-region="eu-central-1" #Make sure it is the same in the terraform variables
-aws_id="AWS_ID"
-repo_name="nodejs-app"  # name of ecr repo to store image docker 
-# If you wanna change the repository name make sure you change it in the k8s/app.yml (Image name) 
-image_name="$aws_id.dkr.ecr.$region.amazonaws.com/$repo_name:latest"
-dbsecret="db-password-secret" # to store password for database in k8s secret
-namespace="nodejs-app" # namespace in k8s which will be used to deploy the application and monitoring tools
-# End Variables
+region="eu-central-1"
+aws_id="649126925327"
+repo_name="nodejs-app"
 
-# NodePorts
-APP_NODEPORT=32000
+image_name="$aws_id.dkr.ecr.$region.amazonaws.com/$repo_name:latest"
+
+dbsecret="db-password-secret"
+namespace="nodejs-app"
+
+APP_NODEPORT="30080"
 PROMETHEUS_NODEPORT=30900
 GRAFANA_NODEPORT=30090
 ALERT_NODEPORT=30910
 
+# ================= Start =================
+echo "==================== START ===================="
 
-
-# update helm repos
+# update helm
 helm repo update
 
-# create the cluster
-echo "--------------------Creating EKS--------------------" # 
-echo "--------------------Creating ECR--------------------" #
-echo "--------------------Creating EBS--------------------" #
-cd terraform && \  
-terraform init  # get tf and install provider like as aws 
-terraform apply -auto-approve # # create all requirments for the cluster and monitoring tools and ingress
-cd .. # get back to root directory
+# ================= CLEAN OLD =================
+echo "--------------------Cleaning Old Resources--------------------"
 
-# update kubeconfig
+kubectl delete namespace $namespace --ignore-not-found
+kubectl delete secret $dbsecret -n $namespace --ignore-not-found
+
+# optional (clean terraform)
+cd terraform
+
+echo "Destroy old infra..."
+terraform destroy -auto-approve || true
+
+echo "Apply new infra..."
+terraform init
+terraform apply -auto-approve
+
+cd ..
+
+# ================= KUBECONFIG =================
 echo "--------------------Update Kubeconfig--------------------"
-aws eks update-kubeconfig --name $cluster_name --region $region 
-# update kubeconfig to be able to connect to the cluster with kubectl and deploy the application and monitoring tools
+aws eks update-kubeconfig --name $cluster_name --region $region
 
-# remove preious docker images
-echo "--------------------Remove Previous build--------------------"
-docker rmi -f $image_name || true # delete previous image if exist to avoid build error because of same tag
+# ================= WAIT FOR NODES =================
+echo "--------------------Waiting for Nodes--------------------"
 
-# build new docker image with new tag
-echo "--------------------Build new Image--------------------"
+for i in {1..30}; do
+  NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | wc -l)
+
+  if [ "$NODE_COUNT" -gt 0 ]; then
+    echo "Nodes are ready ✅"
+    break
+  fi
+
+  echo "Waiting for nodes..."
+  sleep 10
+done
+
+# لو مفيش nodes
+if [ "$NODE_COUNT" -eq 0 ]; then
+  echo "❌ No nodes available. Check EKS Node Group!"
+  exit 1
+fi
+
+# ================= DOCKER =================
+echo "--------------------Docker Build--------------------"
+
+docker rmi -f $image_name || true
 docker build -t $image_name .
 
-#ECR Login
 echo "--------------------Login to ECR--------------------"
 aws ecr get-login-password --region $region | docker login --username AWS --password-stdin $aws_id.dkr.ecr.$region.amazonaws.com
-#get password from aws and login to ecr to be able to push the image in ecr repository 
 
-
-# push the latest build to dockerhub
-echo "--------------------Pushing Docker Image--------------------"
+echo "--------------------Push Image--------------------"
 docker push $image_name
-# push image on ecr repository to be able to pull it in k8s and deploy the application
 
-# create namespace
-echo "--------------------creating Namespace--------------------"
-kubectl create ns $namespace || true
-#create namespace in k8s to deploy the application and monitoring tools in it to be organized and separated from other namespaces
+# ================= K8S =================
+echo "--------------------Create Namespace--------------------"
+kubectl create ns $namespace --dry-run=client -o yaml | kubectl apply -f -
 
-# Generate database password
-echo "--------------------Generate DB password--------------------"
+echo "--------------------Create Secret--------------------"
 PASSWORD=$(openssl rand -base64 12)
-# create random password for database to be used in the application and store it in k8s secret to be used in the deployment of the application and keep it secure
 
-# Store the generated password in k8s secrets
-echo "--------------------Store the generated password in k8s secret--------------------"
-kubectl create secret generic $dbsecret --from-literal=DB_PASSWORD=$PASSWORD --namespace=$namespace || true
-# create k8s secret to store the generated password for database to be used in the deployment of the application and keep it secure
+kubectl create secret generic $dbsecret \
+  --from-literal=DB_PASSWORD=$PASSWORD \
+  --namespace=$namespace \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-# Deploy the application
+# ================= DEPLOY =================
 echo "--------------------Deploy App--------------------"
 kubectl apply -n $namespace -f k8s
-# deploy the application in k8s using the deployment and service yaml files in the k8s directory and specify the namespace to deploy it in
 
-# Wait for application to be deployed
-echo "--------------------Wait for all pods to be running--------------------"
-kubectl wait --for=condition=Ready pod -l app=nodejs-app -n $namespace --timeout=120s
-#sleep 60s
+# ================= WAIT PODS =================
+echo "--------------------Waiting for Pods--------------------"
+kubectl wait --for=condition=Ready pod -l app=nodejs-app -n $namespace --timeout=180s
 
-
-# Get Node IP
+# ================= GET NODE IP =================
 NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
 
-# Get ingress URL
-#echo "--------------------Ingress URL--------------------"
-#kubectl get ingress nodejs-app-ingress -n $namespace -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-# get the ingress URL to be able to access the application and monitoring tools through it and add CNAME record in the domain to point to this URL to access the application and monitoring tools through the domain
-
-# Display URLs
-echo " "
-echo "--------------------Application URL--------------------"
-echo "http://$NODE_IP:$APP_NODEPORT"
-echo "--------------------Prometheus URL--------------------"
-echo "http://$NODE_IP:$PROMETHEUS_NODEPORT"
-echo "--------------------Grafana URL--------------------"
-echo "http://$NODE_IP:$GRAFANA_NODEPORT"
-echo "--------------------Alertmanager URL--------------------"
-echo "http://$NODE_IP:$ALERT_NODEPORT"
-echo " "
-
+# ================= OUTPUT =================
+echo ""
+echo "==================== URLs ===================="
+echo "App:          http://$NODE_IP:$APP_NODEPORT"
+echo "Prometheus:   http://$NODE_IP:$PROMETHEUS_NODEPORT"
+echo "Grafana:      http://$NODE_IP:$GRAFANA_NODEPORT"
+echo "Alertmanager: http://$NODE_IP:$ALERT_NODEPORT"
+echo "============================================="
 
 
 #delete ingress and domain
