@@ -50,6 +50,11 @@ jobs:
           NAMESPACE: nodejs-app
         run: |
           export KUBECONFIG=$(pwd)/kubeconfig
+
+          # ✅ إنشاء namespace لو مش موجود
+          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+
+          # ✅ بعد كده اعمل deploy
           kubectl apply -n $NAMESPACE -f k8s
 
       # ✅ اختياري (Best Practice)
