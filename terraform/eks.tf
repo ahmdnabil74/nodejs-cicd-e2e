@@ -285,7 +285,7 @@ resource "helm_release" "cluster-autoscaler" {
   create_namespace = false
   timeout          = 300
   wait             = true
-
+  depends_on = [module.eks]
   set {
     name  = "cloudProvider"
     value = "aws"

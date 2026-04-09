@@ -53,13 +53,11 @@ metadata:
 spec:
   selector: # define which ports will be applied bt service 
     app: nodejs-app
-  type: NodePort # to create a node port service to expose the service outside the cluster by url , type of service
+  type: LoadBalancer # to create a node port service to expose the service outside the cluster by url , type of service
   ports:
-    - name: nodejs-app
-      port: 8000 # port which service will listend on it inside cluster 
+    - name: http
+      port: 80 # port which service will listend on it inside cluster 
       targetPort: 8000 # port inside pod 
-      nodePort: 32000 # port which service will listend on it outside cluster
-
 
 ---
 #apiVersion: networking.k8s.io/v1
