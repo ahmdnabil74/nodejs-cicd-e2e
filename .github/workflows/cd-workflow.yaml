@@ -10,7 +10,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    # Run only if CI succeeded
     if: github.event.workflow_run.conclusion == 'success'
 
     steps:
@@ -24,42 +23,42 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
 
-      - name: Set up Kubectl
+      - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: latest
 
-      - name: Verify kubectl
+      - name: Verify kubectl installation
         run: kubectl version --client
 
       - name: Configure kubeconfig
         run: |
           echo "${{ secrets.KUBECONFIG_SECRET }}" | base64 -d > kubeconfig
           chmod 600 kubeconfig
-          export KUBECONFIG=$(pwd)/kubeconfig
-          kubectl get nodes
-      # ✅ الحل هنا
-      - name: Create Namespace (if not exists)
+
+      - name: Verify cluster connection
         env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          kubectl get nodes
+
+      - name: Create namespace if not exists
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
           NAMESPACE: nodejs-app
         run: |
-          kubectl create namespace $NAMESPACE || echo "Namespace already exists"
+          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
       - name: Deploy to Kubernetes
         env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
           NAMESPACE: nodejs-app
         run: |
-          export KUBECONFIG=$(pwd)/kubeconfig
-
-          # ✅ إنشاء namespace لو مش موجود
-          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
-
-          # ✅ بعد كده اعمل deploy
           kubectl apply -n $NAMESPACE -f k8s
 
-      # ✅ اختياري (Best Practice)
-      - name: Verify Deployment
+      - name: Verify deployment
         env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
           NAMESPACE: nodejs-app
         run: |
           kubectl get pods -n $NAMESPACE
