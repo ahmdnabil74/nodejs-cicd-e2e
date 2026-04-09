@@ -1,4 +1,5 @@
 name: Continuous Deployment
+
 on:
   workflow_run:
     workflows: ["Continuous Integration"]
@@ -8,34 +9,52 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
-    # Check if the CI workflow was successful
+
+    # Run only if CI succeeded
     if: github.event.workflow_run.conclusion == 'success'
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
 
       - name: Set up Kubectl
-        uses: azure/setup-kubectl@v1
+        uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
 
       - name: Verify kubectl
+        run: kubectl version --client
+
+      - name: Configure kubeconfig
         run: |
-          kubectl version --client
+          echo "${{ secrets.KUBECONFIG_SECRET }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+          kubectl get nodes
+
+      # ✅ الحل هنا
+      - name: Create Namespace (if not exists)
+        env:
+          NAMESPACE: nodejs-app
+        run: |
+          kubectl create namespace $NAMESPACE || echo "Namespace already exists"
 
       - name: Deploy to Kubernetes
         env:
           NAMESPACE: nodejs-app
         run: |
-          echo "${{ secrets.KUBECONFIG_SECRET }}" | base64 -d > kubeconfig
-          export KUBECONFIG=kubeconfig
           kubectl apply -n $NAMESPACE -f k8s
+
+      # ✅ اختياري (Best Practice)
+      - name: Verify Deployment
+        env:
+          NAMESPACE: nodejs-app
+        run: |
+          kubectl get pods -n $NAMESPACE
+          kubectl get svc -n $NAMESPACE
