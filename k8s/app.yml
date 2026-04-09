@@ -82,5 +82,5 @@ spec:
 
                   #kubectl apply -f k8s -n nodejs-app
                   #kubectl get pods -n nodejs-app : Running
-                  #kubectl get svc -n nodejs-app : nodejs-app-service   NodePort   30080
+                  #kubectl get svc -n nodeejs-app : nodejs-app-service   NodePort   30080
                   # http://<EC2-PUBLIC-IP>:30080
