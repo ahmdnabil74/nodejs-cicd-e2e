@@ -35,9 +35,9 @@ jobs:
       - name: Configure kubeconfig
         run: |
           echo "${{ secrets.KUBECONFIG_SECRET }}" | base64 -d > kubeconfig
-          export KUBECONFIG=kubeconfig
+          chmod 600 kubeconfig
+          export KUBECONFIG=$(pwd)/kubeconfig
           kubectl get nodes
-
       # ✅ الحل هنا
       - name: Create Namespace (if not exists)
         env:
@@ -49,6 +49,7 @@ jobs:
         env:
           NAMESPACE: nodejs-app
         run: |
+          export KUBECONFIG=$(pwd)/kubeconfig
           kubectl apply -n $NAMESPACE -f k8s
 
       # ✅ اختياري (Best Practice)
