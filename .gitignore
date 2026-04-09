@@ -1,5 +1,4 @@
 node_modules
-package*
 .terraform
 .terraform*
 *tfstate*
