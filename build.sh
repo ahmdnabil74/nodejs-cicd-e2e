@@ -31,9 +31,6 @@ kubectl delete secret $dbsecret -n $namespace --ignore-not-found
 # optional (clean terraform)
 cd terraform
 
-echo "Destroy old infra..."
-terraform destroy -auto-approve || true
-
 echo "Apply new infra..."
 terraform init
 terraform apply -auto-approve
